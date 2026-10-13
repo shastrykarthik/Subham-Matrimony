@@ -1,0 +1,301 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: profiles
+    description: Community matrimony profiles
+  - name: connections
+    description: Member connection requests
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /profiles:
+    get:
+      operationId: listProfiles
+      tags: [profiles]
+      summary: Search publicly approved profiles
+      parameters:
+        - in: query
+          name: gender
+          schema: { type: string, enum: [Male, Female] }
+        - in: query
+          name: minAge
+          schema: { type: integer, minimum: 18 }
+        - in: query
+          name: maxAge
+          schema: { type: integer, minimum: 18 }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: gothra
+          schema: { type: string }
+        - in: query
+          name: rashi
+          schema: { type: string }
+        - in: query
+          name: minIncome
+          schema: { type: number, minimum: 0 }
+        - in: query
+          name: maxIncome
+          schema: { type: number, minimum: 0 }
+      responses:
+        "200":
+          description: Approved profiles matching the filters
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Profile" }
+    post:
+      operationId: createProfile
+      tags: [profiles]
+      summary: Create a profile pending administrator approval
+      security: [{ clerkSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileInput" }
+      responses:
+        "201":
+          description: Profile created and awaiting review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+  /profiles/stats:
+    get:
+      operationId: getProfileStats
+      tags: [profiles]
+      summary: Get community profile totals
+      responses:
+        "200":
+          description: Community counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfileStats" }
+  /profiles/pending:
+    get:
+      operationId: listPendingProfiles
+      tags: [profiles]
+      summary: List profiles waiting for moderator review
+      security: [{ clerkSession: [] }]
+      responses:
+        "200":
+          description: Pending profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PendingProfile" }
+  /profiles/{id}:
+    get:
+      operationId: getProfile
+      tags: [profiles]
+      summary: Get a profile by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "404": { description: Not found }
+  /profiles/{id}/approve:
+    patch:
+      operationId: approveProfile
+      tags: [profiles]
+      summary: Approve a profile for public search
+      security: [{ clerkSession: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileApproval" }
+      responses:
+        "200":
+          description: Updated profile approval state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+  /connections:
+    get:
+      operationId: listConnections
+      tags: [connections]
+      summary: List the signed-in member's sent and received requests
+      security: [{ clerkSession: [] }]
+      responses:
+        "200":
+          description: Connection requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Connection" }
+    post:
+      operationId: createConnection
+      tags: [connections]
+      summary: Send a connection request
+      security: [{ clerkSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectionInput" }
+      responses:
+        "201":
+          description: Connection request created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /connections/{id}/respond:
+    patch:
+      operationId: respondToConnection
+      tags: [connections]
+      summary: Accept or decline an incoming connection request
+      security: [{ clerkSession: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectionResponseInput" }
+      responses:
+        "200":
+          description: Updated request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Profile:
+      type: object
+      required: [id, fullName, gender, dateOfBirth, gothra, nakshatra, rashi, familyValues, educationQualification, currentOccupation, annualIncomeInr, currentCity, isAdminApproved, createdAt]
+      properties:
+        id: { type: integer }
+        fullName: { type: string }
+        gender: { type: string, enum: [Male, Female] }
+        dateOfBirth: { type: string, format: date }
+        gothra: { type: string }
+        nakshatra: { type: ["string", "null"] }
+        rashi: { type: ["string", "null"] }
+        familyValues: { type: string, enum: [Orthodox, Moderate, Liberal] }
+        educationQualification: { type: string }
+        currentOccupation: { type: string }
+        annualIncomeInr: { type: number }
+        currentCity: { type: string }
+        isAdminApproved: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    ProfileInput:
+      type: object
+      required: [fullName, gender, dateOfBirth, email, phoneNumber, gothra, familyValues, educationQualification, currentOccupation, annualIncomeInr, currentCity]
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        gender: { type: string, enum: [Male, Female] }
+        dateOfBirth: { type: string, format: date }
+        email: { type: string, format: email }
+        phoneNumber: { type: string, minLength: 7, maxLength: 20 }
+        gothra: { type: string, minLength: 1, maxLength: 50 }
+        nakshatra: { type: ["string", "null"] }
+        rashi: { type: ["string", "null"] }
+        familyValues: { type: string, enum: [Orthodox, Moderate, Liberal] }
+        educationQualification: { type: string }
+        currentOccupation: { type: string }
+        annualIncomeInr: { type: number, minimum: 0 }
+        currentCity: { type: string, minLength: 1 }
+    ProfileApproval:
+      type: object
+      required: [isAdminApproved]
+      properties:
+        isAdminApproved: { type: boolean }
+    PendingProfile:
+      type: object
+      required: [id, fullName, gender, dateOfBirth, email, phoneNumber, gothra, nakshatra, rashi, familyValues, educationQualification, currentOccupation, annualIncomeInr, currentCity, isAdminApproved, createdAt]
+      properties:
+        id: { type: integer }
+        fullName: { type: string }
+        gender: { type: string, enum: [Male, Female] }
+        dateOfBirth: { type: string, format: date }
+        email: { type: string, format: email }
+        phoneNumber: { type: string }
+        gothra: { type: string }
+        nakshatra: { type: ["string", "null"] }
+        rashi: { type: ["string", "null"] }
+        familyValues: { type: string, enum: [Orthodox, Moderate, Liberal] }
+        educationQualification: { type: string }
+        currentOccupation: { type: string }
+        annualIncomeInr: { type: number }
+        currentCity: { type: string }
+        isAdminApproved: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    ProfileStats:
+      type: object
+      required: [approved, pending]
+      properties:
+        approved: { type: integer }
+        pending: { type: integer }
+    Connection:
+      type: object
+      required: [id, toProfileId, status, createdAt, direction, profile]
+      properties:
+        id: { type: integer }
+        toProfileId: { type: integer }
+        status: { type: string, enum: [pending, accepted, declined] }
+        createdAt: { type: string, format: date-time }
+        direction: { type: string, enum: [sent, received] }
+        profile: { $ref: "#/components/schemas/Profile" }
+    ConnectionInput:
+      type: object
+      required: [toProfileId]
+      properties:
+        toProfileId: { type: integer }
+    ConnectionResponseInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [accepted, declined] }
+
